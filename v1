@@ -1,0 +1,550 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# import proper packages
+
+# In[360]:
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+
+import warnings
+warnings.filterwarnings('ignore')
+
+
+# EXPLORATION
+# open the train and the test datasets, gather them into an all_data_set and explore values
+
+# In[293]:
+
+
+train = pd.read_csv(r'C:\Users\jeanm\Anaconda3\envs\test\books\titanic\train.csv', delimiter=',')
+print(train.shape)
+test=pd.read_csv(r'C:\Users\jeanm\Anaconda3\envs\test\books\titanic\test.csv', delimiter=',')
+print(test.shape)
+
+
+# concatenate the 2 datasets into one for data exploration and feature engineering
+
+# In[294]:
+
+
+train_all=pd.concat([train, test],sort=True).reset_index(drop=True)
+print(train_all.shape)
+
+
+# list of the column names of train dataset
+
+# In[295]:
+
+
+train_all.columns
+
+
+# analyse of each feature of the dataset
+
+# In[296]:
+
+
+train_all.isnull().sum()
+
+
+# 263 ages missing, 1014 cabins missing, 2 embarked missing, 1 fare missing, 418 survived missing (to be predicted ;))
+
+# In[297]:
+
+
+train_all['Survived']=train_all['Survived'].astype('category')
+train_all.groupby(by='Survived').count()
+
+
+# 549 died, 342 survived
+
+# In[298]:
+
+
+train_all['Sex']=train_all['Sex'].astype('category')
+print(train_all.groupby(by='Sex').count())
+print(train_all['Sex'].isnull().sum())
+
+
+# 464 female and 843 male on the boat in the dataset
+
+# In[299]:
+
+
+train_all['Pclass']=train_all['Pclass'].astype('category')
+print(train_all.groupby(by='Pclass').count())
+print(train_all['Pclass'].isnull().sum())
+
+
+# 3 different classed: 323 in 1st class, 277 in 2nd class and 709 in 3rd class
+
+# In[300]:
+
+
+train_all['Age']=train_all['Age'].astype('float')
+plt.figure(1)
+train_all['Age'].hist(bins=20)
+plt.xlabel('age of passengers')
+plt.show
+print(train_all['Age'].mean())
+print(train_all['Age'].isnull().sum())
+
+
+# mean age is 30 years old. It goes from 0 (babies x40) to more than 70 years old (olderies). 
+# there are 263 people where we are missing the age.
+
+# In[301]:
+
+
+plt.figure(2)
+train_all['SibSp'].hist(bins=20)
+plt.xlabel('# number of siblings or spouses')
+plt.show
+print(train_all['SibSp'].mean())
+print(train_all.groupby(by='SibSp').count())
+print(train_all['SibSp'].isnull().sum())
+
+
+# 891 passengers are sole, 319 have 1 spouse, and the rest are 'adults' families
+
+# In[302]:
+
+
+plt.figure(3)
+train_all['Parch'].hist(bins=20)
+plt.xlabel('# number of children on the boat')
+plt.show
+print(train_all['Parch'].mean())
+train.groupby(by='Parch').count()
+print(train_all['Parch'].isnull().sum())
+
+
+# 1000 passengers don't have children, around 200 got one, around 100 got 2
+
+# In[303]:
+
+
+print(train_all['Cabin'].isnull().sum())
+train_all['Cabin'].isnull().sum()/train_all.shape[0]*100
+
+
+# there is no cabin information for 1014 passengers (77.5%). We will not use the cabin info so.
+
+# In[304]:
+
+
+plt.figure(4)
+train_all['Fare'].hist(bins=20)
+plt.xlabel('Fare in USD')
+plt.show
+print(train_all['Fare'].mean(), train_all['Fare'].min(),train_all['Fare'].max())
+print(train_all['Fare'].isnull().sum())
+print(train_all.groupby(by='Pclass').Fare.mean())
+
+
+# mean fare is 33USD, there is a great disparity of fares, from 0 USD to 512USD (mean fares are: Pclass1=87.5USD, Pclass2=21.2USD, Pclass3=13.3USD)
+
+# In[305]:
+
+
+print(train_all['Embarked'].isnull().sum())
+train_all.groupby(by='Embarked').count()
+
+
+# 2 person are missing there embarkment code; there are 3 possible embarking codes: C (Cherbourg), Q (Queenstown) and S (Southampton)
+
+# In[306]:
+
+
+train_all['Ticket'].isnull().sum()
+
+
+# CONSOLIDATION OF THE DATA SET
+
+# first: fill in the missing ages
+
+# In[307]:
+
+
+sns.set(style="whitegrid")
+ax = sns.barplot(x=train_all["Sex"],y=train_all['Age'],hue=train_all['Pclass'])
+
+
+# In[308]:
+
+
+ax = sns.barplot(x=train_all["Survived"],y=train_all['Age'],hue=train_all['Sex'])
+
+
+# let's make a routine to fill in the missing age data with the mean value from the corresponding Class and Sex category
+
+# In[309]:
+
+
+#compute the mean values and store in a list
+mean_age=train_all.groupby(by=['Sex','Pclass']).mean()
+mean_age=mean_age['Age']
+print(mean_age)
+
+
+# In[310]:
+
+
+train_all['Age_fill']=np.zeros(train_all.shape[0])
+for i in range(train_all.shape[0]):
+    a=0
+    b=0
+    c=0
+    if np.isnan(train_all.loc[i,'Age']):
+        if train_all.loc[i,'Sex']=='Male':
+            a =3
+        else:
+            a=0
+        if train_all.loc[i,'Pclass']==1:
+            b=0
+        elif train_all.loc[i,'Pclass']==2:
+            b=1
+        else:
+            b=2
+        c=a+b
+        train_all.loc[i,'Age_fill']=mean_age[c]
+    else:
+        train_all.loc[i,'Age_fill']=train_all.loc[i,'Age']
+
+print(train_all['Age'].isnull().sum())
+print(train_all['Age_fill'].isnull().sum())
+    
+            
+
+
+# In[311]:
+
+
+#getting a summary of the null values
+train_all.isnull().sum()
+
+
+# Second: clean the Title column into only 4 groups = Mr, Mrs, Miss, and Master
+
+# In[312]:
+
+
+train_all['Title']=train_all['Name'].str.extract('([A-Za-z]+)\.', expand=False)
+train_all.groupby(by=['Title']).count()
+
+
+# In[313]:
+
+
+train_all.Title=train_all.Title.replace(['Capt','Col','Don','Dr','Jonkheer','Major','Rev','Sir'],'Mr')
+train_all.Title=train_all.Title.replace(['Countess','Dona','Mme','Lady'],'Mrs')
+train_all.Title=train_all.Title.replace(['Mlle','Ms'],'Miss')
+train_all.groupby(by=['Title']).count()
+
+
+# Fourth: family size, Mother and Free tickets are considered as new variables too
+
+# In[314]:
+
+
+train_all['FamilySize'] = train_all.SibSp + train_all.Parch + 1
+train_all['Mother'] = np.where((train_all.Title=='Mrs') & (train_all.Parch >0),1,0)
+train_all['Free'] = np.where(train_all['Fare']==0, 1,0)
+
+
+# we create a feature to gather family sizes: 'Alone','Small=<2','Medium=<4', 'large>=5'
+
+# In[315]:
+
+
+train_all['Alone']=np.where((train_all.FamilySize==1),1,0)
+train_all['SmallFamily']=np.where((train_all.FamilySize>1)&(train_all.FamilySize<=2),1,0)
+train_all['MediumFamily']=np.where((train_all.FamilySize>2)&(train_all.FamilySize<=4),1,0)
+train_all['LargeFamily']=np.where((train_all.FamilySize>4),1,0)
+
+
+# create an age feature by splitting continuous variable AGE into different groups: babies <2, young child<6, adolescent<16, adult<45, old >45
+
+# In[316]:
+
+
+train_all['baby']=np.where((train_all.Age_fill<2),1,0)
+train_all['young_child']=np.where((train_all.Age_fill<6)&(train_all.Age_fill>=2),1,0)
+train_all['ado']=np.where((train_all.Age_fill<16)&(train_all.Age_fill>=6),1,0)
+train_all['adult']=np.where((train_all.Age_fill<45)&(train_all.Age_fill>=16),1,0)
+train_all['old']=np.where((train_all.Age_fill>=45),1,0)
+
+
+# In[232]:
+
+
+train_all.isnull().sum()
+
+
+# Fifth: we fill the 2 missing embarked by the most represented category = 'S'
+
+# In[317]:
+
+
+train_all['Embarked']=train_all['Embarked'].fillna('S')
+train_all['Fare']=train_all['Fare'].fillna(train_all['Fare'].mean(skipna=True))
+train_all.isnull().sum()
+
+
+# create bins for the continuous Fare variable
+
+# In[319]:
+
+
+train_all['Fare_bin'] = pd.qcut(train_all['Fare'], 13)
+#train_all['Fare_bin'].head(20)
+
+
+# how to extract some features from the ticket values ? idea is to count the frequency of tickets for each ticket, this would complete the information from family size for groups which are not families but travelling togetherE
+
+# In[320]:
+
+
+train_all['Ticket_Frequency'] = train_all.groupby('Ticket')['Ticket'].transform('count')
+#plt.hist(train_all['Ticket_Frequency'],bins=20)
+
+
+# Extract the deck informations from the cabin for those where we have
+
+# In[328]:
+
+
+train_all['Cabin'].head()
+train_all['Deck']=np.zeros(train_all.shape[0])
+for i in range(train_all.shape[0]):
+    if pd.isnull(train_all.loc[i,'Cabin'])!=True:
+        train_all.loc[i,'Deck']=train_all.loc[i,'Cabin'][0]
+    else:
+        train_all.loc[i,'Deck']='M'
+            
+train_all.groupby(by=['Deck']).count()
+
+
+# In[329]:
+
+
+train_all.columns
+
+
+# In[330]:
+
+
+train_all=train_all.drop(['PassengerId','Age','SibSp','Parch','Ticket','Cabin','Name','Fare'],axis=1)
+print(train_all.shape)
+train_all.columns
+
+
+# we copy survived column into a variable
+
+# In[331]:
+
+
+Survived=train_all['Survived']
+Survived.shape
+
+
+# it is crucial to create dummy variables for all the categorical variables using the pd.get_dummies() function
+
+# In[332]:
+
+
+train_all=pd.get_dummies(train_all)
+train_all=train_all.drop(['Survived_0.0','Survived_1.0'],axis=1)
+train_all['Survived']=Survived
+train_all.columns
+train_all.isnull().sum()
+
+
+# 
+# ******
+# Now, let's run some machine learning models on the dataset to predic the survivability
+
+# as a first step, we are going to split the train data set into a TRAIN and TEST data set to check for the accuracy of the model. I use "train_test_split" from sklearn
+
+# In[352]:
+
+
+from sklearn.model_selection import train_test_split
+train_good=train_all[train_all.Survived.isnull()==False]
+X=train_good.drop('Survived',axis=1)
+#print(X.columns)
+print(X.shape)
+Y=train_good['Survived']
+print(Y.shape)
+X_train,X_test,y_train,y_test=train_test_split(X,Y,test_size=0.4,random_state=2019)
+print(X_train.shape, X_test.shape,y_train.shape,y_test.shape)
+
+
+# Then, we are training some models on the test dataset
+
+# In[358]:
+
+
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import auc
+
+gb = GradientBoostingClassifier(n_estimators=2500, random_state=2018)
+rf = RandomForestClassifier(n_estimators=3500, max_depth=10,min_samples_split=2,random_state=2018)
+knn = KNeighborsClassifier(n_neighbors=5)
+nn = MLPClassifier((60,10, 10), early_stopping=False, max_iter=400, random_state=2018)
+
+Results = pd.DataFrame({'Model': [],'Accuracy Score': []})
+
+gb.fit(X_train, y_train)
+Y_pred= gb.predict(X_test)
+res = pd.DataFrame({"Model":['GradientBoostingClassifier'],
+                    "Accuracy Score": [accuracy_score(Y_pred,y_test)]})
+Results = Results.append(res)
+
+rf.fit(X_train, y_train)
+Y_pred= rf.predict(X_test)
+res = pd.DataFrame({"Model":['RandomForestClassifier'],
+                    "Accuracy Score": [accuracy_score(Y_pred,y_test)]})
+Results = Results.append(res)
+
+knn.fit(X_train, y_train)
+Y_pred= knn.predict(X_test)
+res = pd.DataFrame({"Model":['KNeighborsClassifier'],
+                    "Accuracy Score": [accuracy_score(Y_pred,y_test)]})
+Results = Results.append(res)
+
+nn.fit(X_train, y_train)
+Y_pred= nn.predict(X_test)
+res = pd.DataFrame({"Model":['NeuralNetwork'],
+                    "Accuracy Score": [accuracy_score(Y_pred,y_test)]})
+Results = Results.append(res)
+
+Results
+
+
+# the randomForestClassifier offers the best accuracy score: 0.8699
+# Now, we want to apply this prediction to the test data set 
+# we will then first have to transform the test data set appropriately in order to feed the best model built;
+
+# In[346]:
+
+
+test_good=train_all[train_all.Survived.isnull()==True]
+test_good=test_good.drop(['Survived'],axis=1)
+print(test_good.shape)
+print(test_good.isnull().sum())
+print(test_good.columns)
+
+
+# Now we can apply the built model on test_good and save it in a csv file
+
+# In[347]:
+
+
+result=pd.DataFrame(np.zeros((test.shape[0],2)),columns=['PassengerId','Survived'])
+result['Survived']=rf.predict(test_good).astype(int)
+result['PassengerId']=test['PassengerId']
+print(result.head(5))
+result[['PassengerId','Survived']].to_csv(r"C:\Users\jeanm\Anaconda3\envs\test\books\titanic\submissionJM14.csv",index=False)
+print("done1")
+
+
+# In[348]:
+
+
+result.groupby('Survived').count()
+
+
+# the next step is to try to optimize the random forest classifier
+
+# In[361]:
+
+
+#depths exploration
+max_depths = np.linspace(1, 32, 32, endpoint=True)
+train_results = []
+test_results = []
+for max_depth in max_depths:
+   rf_opt = RandomForestClassifier(max_depth=max_depth, n_jobs=-1)
+   rf_opt.fit(X_train, y_train)
+   train_pred = rf_opt.predict(X_train)
+   false_positive_rate, true_positive_rate, thresholds = roc_curve(y_train, train_pred)
+   roc_auc = auc(false_positive_rate, true_positive_rate)
+   train_results.append(roc_auc)
+   y_pred = rf_opt.predict(X_test)
+   false_positive_rate, true_positive_rate, thresholds = roc_curve(y_test, y_pred)
+   roc_auc = auc(false_positive_rate, true_positive_rate)
+   test_results.append(roc_auc)
+from matplotlib.legend_handler import HandlerLine2D
+line1, = plt.plot(max_depths, train_results, 'b', label="Train AUC")
+line2, = plt.plot(max_depths, test_results, 'r', label="Test AUC")
+plt.legend(handler_map={line1: HandlerLine2D(numpoints=2)})
+plt.ylabel('AUC score')
+plt.xlabel('Tree depth')
+plt.show
+
+
+# the max tree depth is around 5
+
+# In[380]:
+
+
+#n_estimators exploration
+n_est = np.linspace(500, 1000, 50, endpoint=True,dtype='int')
+train_results = []
+test_results = []
+for n_ests in n_est:
+   rf_opt = RandomForestClassifier(n_estimators=n_ests,max_depth=5, n_jobs=-1)
+   rf_opt.fit(X_train, y_train)
+   train_pred = rf_opt.predict(X_train)
+   false_positive_rate, true_positive_rate, thresholds = roc_curve(y_train, train_pred)
+   roc_auc = auc(false_positive_rate, true_positive_rate)
+   train_results.append(roc_auc)
+   y_pred = rf_opt.predict(X_test)
+   false_positive_rate, true_positive_rate, thresholds = roc_curve(y_test, y_pred)
+   roc_auc = auc(false_positive_rate, true_positive_rate)
+   test_results.append(roc_auc)
+from matplotlib.legend_handler import HandlerLine2D
+line1, = plt.plot(n_est, train_results, 'b', label="Train AUC")
+line2, = plt.plot(n_est, test_results, 'r', label="Test AUC")
+plt.legend(handler_map={line1: HandlerLine2D(numpoints=2)})
+plt.ylabel('AUC score')
+plt.xlabel('n_estimators')
+plt.show
+
+
+# In[381]:
+
+
+rf_opt = RandomForestClassifier(n_estimators=780, max_depth=5,min_samples_split=2,random_state=2018)
+rf_opt.fit(X_train, y_train)
+result=pd.DataFrame(np.zeros((test.shape[0],2)),columns=['PassengerId','Survived'])
+result['Survived']=rf_opt.predict(test_good).astype(int)
+result['PassengerId']=test['PassengerId']
+print(result.head(5))
+result[['PassengerId','Survived']].to_csv(r"C:\Users\jeanm\Anaconda3\envs\test\books\titanic\submissionJM16.csv",index=False)
+print("done1")
+
+
+# In[382]:
+
+
+result.groupby('Survived').count()
+
+
+# the saved result is submitted to the Kaggle platform
+
+# In[ ]:
+
+
+
+
